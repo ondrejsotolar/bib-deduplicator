@@ -54,7 +54,7 @@ def merge_records(records: Dict[str, dict], duplicates: Dict[str, dict], new_rec
             while n["ID"] + suffix in duplicates:
                 i += 1
                 suffix = "_" + str(i)
-            duplicates[n["ID"]] = n
+            duplicates[n["ID"] + suffix] = n
         else:
             records[n["ID"]] = n
 
