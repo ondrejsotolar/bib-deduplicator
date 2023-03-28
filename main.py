@@ -7,11 +7,10 @@ from bibtexparser.bparser import BibTexParser
 from typing import Dict
 
 
-def search_dir(pth, recursive):
+def search_dir(pth):
     """
     Search directory for files with .bib suffix.
     :param pth: start search here
-    :param recursive: search all subdirectories
     :return: list of .bib file paths
     """
     bibfiles = []
@@ -23,11 +22,10 @@ def search_dir(pth, recursive):
     return bibfiles
 
 
-def read_records(pth: Path, throw_if_invalid: bool) -> BibDatabase:
+def read_records(pth: Path) -> BibDatabase:
     """
     Retrieve citation record key and the whole record from .bib file.
     :param pth: .bib file
-    :param throw_if_invalid: throws ValueError on parse error otherwise tries to parse further
     :return: dict where keys are the record keys and values the whole records
     """
     parser = BibTexParser(common_strings=False)
@@ -42,9 +40,11 @@ def read_records(pth: Path, throw_if_invalid: bool) -> BibDatabase:
 def merge_records(records: Dict[str, dict], duplicates: Dict[str, dict], new_records: BibDatabase) -> None:
     """
     Borrows records and duplicates and merges them with new_records to have distinct keys in records.
+    Note: In this version, it processes only the 'entries' of
+    a BibDatabase object (leaves out 'comments', 'preambles', 'strings'] which is TODO)
     :param records: records with distinct keys
     :param duplicates: records with keys that were already in records
-    :param duplicates: new records
+    :param new_records: a BibDatabase object that is to be merged
     :return: None
     """
     for n in new_records.entries:
@@ -59,22 +59,39 @@ def merge_records(records: Dict[str, dict], duplicates: Dict[str, dict], new_rec
             records[n["ID"]] = n
 
 
-def write_records(records: Dict[str, dict], output_name):
+def write_records(records: Dict[str, dict], output_name: str) -> None:
+    """
+    Writes the records to a file.
+    Note: In this version, it writes out only the 'entries' of
+    a BibDatabase object (leaves out 'comments', 'preambles', 'strings'] which is TODO)
+    :param records: dict (bib record key, bib record entry object)
+    :param output_name: out put file name (will be created or overwritten!)
+    :return: None
+    """
     new_bd: BibDatabase = BibDatabase()
     new_bd.entries = records.values()
+
+    # not sure if I could use the 'with' env.
     f = open(output_name, "w")
     bibtexparser.dump(new_bd, f)
     f.close()
 
 
-def run(pth: Path, output_name: str, recursive: bool, throw_if_invalid: bool) -> None:
-    bibs = search_dir(pth, recursive)
+def run(pth: Path, output_name: str) -> None:
+    """
+    Run the script. It searches a directory for all .bib files and merges them to one file with unique records.
+    Furthermore, it outputs all the records with duplicate keys into another file.
+    :param pth: path to the directory, where the recursive search for .bib files starts
+    :param output_name: output file name (will be created or overwritten!)
+    :return:
+    """
+    bibs = search_dir(pth)
 
     records = {}
     duplicates = {}
 
     for p in bibs:
-        recs = read_records(Path(p), throw_if_invalid)
+        recs = read_records(Path(p))
         merge_records(records, duplicates, recs)
     write_records(records, output_name)
     write_records(duplicates, output_name.split(".")[0] + "_duplicates." + output_name.split(".")[1])
@@ -82,17 +99,17 @@ def run(pth: Path, output_name: str, recursive: bool, throw_if_invalid: bool) ->
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
-        print("Specify at least: root directory, output name")
+        print("Less than 2 args. Specify: root directory, output name")
         sys.exit()
 
     if not os.path.exists(sys.argv[0]):
-        print("invalid root directory")
+        print("Invalid root directory")
         sys.exit()
 
     if len(sys.argv) == 2:
-        run(Path(sys.argv[0]), sys.argv[1], recursive=False, throw_if_invalid=True)
+        run(Path(sys.argv[0]), sys.argv[1])
     else:
-        print("TODO")
+        print("More than 2 args. Specify: root directory, output name")
         sys.exit()
 
 
