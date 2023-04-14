@@ -2,7 +2,7 @@ import os
 import sys
 from pathlib import Path
 import bibtexparser
-from bibtexparser.bibdatabase import BibDatabase
+from bibtexparser.bibdatabase import BibDatabase, UndefinedString
 from bibtexparser.bparser import BibTexParser
 from typing import Dict
 
@@ -22,6 +22,22 @@ def search_dir(pth):
     return bibfiles
 
 
+def process_months(params):
+    stems = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct', 'nov','dec']
+
+    def to_numeric(key):
+        for i, v in enumerate(stems):
+            if v in params[key]:
+                params[key] = str(i)
+                break
+
+    if 'month' in params:
+        to_numeric('month')
+    elif 'Month' in params:
+        to_numeric('Month')
+    return params
+
+
 def read_records(pth: Path) -> BibDatabase:
     """
     Retrieve citation record key and the whole record from .bib file.
@@ -29,11 +45,17 @@ def read_records(pth: Path) -> BibDatabase:
     :return: dict where keys are the record keys and values the whole records
     """
     parser = BibTexParser(common_strings=False)
-    parser.ignore_nonstandard_types = False
+    parser.ignore_nonstandard_types = True
     parser.homogenise_fields = False
+    parser.customization = process_months
 
     with open(pth) as bibtex_file:
-        bib_database = bibtexparser.load(bibtex_file, parser)
+        try:
+            bib_database = bibtexparser.load(bibtex_file, parser)
+        except UndefinedString:
+            print(f'UndefinedString exception on: {pth}')
+            raise
+
     return bib_database
 
 
@@ -98,16 +120,16 @@ def run(pth: Path, output_name: str) -> None:
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 3:
         print("Less than 2 args. Specify: root directory, output name")
         sys.exit()
 
-    if not os.path.exists(sys.argv[0]):
+    if not os.path.exists(sys.argv[1]):
         print("Invalid root directory")
         sys.exit()
 
-    if len(sys.argv) == 2:
-        run(Path(sys.argv[0]), sys.argv[1])
+    if len(sys.argv) == 3:
+        run(Path(sys.argv[1]), sys.argv[2])
     else:
         print("More than 2 args. Specify: root directory, output name")
         sys.exit()
