@@ -1,7 +1,7 @@
 import os
 import sys
 from pathlib import Path
-import bibtexparser
+import bibtexparser as pp
 from bibtexparser.bibdatabase import BibDatabase
 from bibtexparser.bparser import BibTexParser
 from typing import Dict
@@ -28,9 +28,8 @@ def read_records(pth: Path) -> BibDatabase:
     :param pth: .bib file
     :return: dict where keys are the record keys and values the whole records
     """
-    parser = BibTexParser(common_strings=False)
-    parser.ignore_nonstandard_types = False
-    parser.homogenise_fields = False
+    record = "@" + pp.Word(pp.alphanums) + pp.original_text_for(pp.nested_expr("{", "}"))
+    parsed = record.parse_string("the string")
 
     with open(pth) as bibtex_file:
         bib_database = bibtexparser.load(bibtex_file, parser)
