@@ -75,19 +75,19 @@ def merge_records(records: Dict[str, Record], duplicates: Dict[str, Record],
             records[k] = v
 
 
-def write_records(records: Dict[str, Record], output_name: str) -> None:
+def write_records(records: Dict[str, Record], output_path: Path) -> None:
     """
     Writes the records to a file.
     :param records: dict (bib record key, bib record entry object)
     :param output_name: out put file name (will be created or overwritten!)
     :return: None
     """
-    with open(output_name, 'w') as f:
+    with open(output_path, 'w') as f:
         for k, v in records.items():
             f.write(f"@{v.type}{v.body}\n")
 
 
-def run(pth: Path, output_name: str) -> None:
+def run(pth: Path, output_path: Path) -> None:
     """
     Run the script. It searches a directory for all .bib files and merges them to one file with unique records.
     Furthermore, it outputs all the records with duplicate keys into another file.
@@ -103,8 +103,8 @@ def run(pth: Path, output_name: str) -> None:
     for p in bib_files:
         recs = read_records(Path(p))
         merge_records(records, duplicates, recs)
-    write_records(records, output_name)
-    write_records(duplicates, output_name.split(".")[0] + "_duplicates." + output_name.split(".")[1])
+    write_records(records, output_path)
+    write_records(duplicates, Path(output_path.name.split(".")[0] + "_duplicates." + output_path.suffix))
 
 
 if __name__ == '__main__':
@@ -117,7 +117,7 @@ if __name__ == '__main__':
         sys.exit()
 
     if len(sys.argv) == 3:
-        run(Path(sys.argv[1]), sys.argv[2])
+        run(Path(sys.argv[1]), Path(sys.argv[2]))
     else:
         print("More than 2 args. Specify: root directory, output name")
         sys.exit()
