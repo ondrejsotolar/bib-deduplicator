@@ -1,11 +1,12 @@
 import os
 import sys
+from collections import namedtuple
 from pathlib import Path
-import bibtexparser as pp
+import pyparsing as pp
 from bibtexparser.bibdatabase import BibDatabase, UndefinedString
-from bibtexparser.bparser import BibTexParser
-from typing import Dict
+from typing import Dict, Tuple
 
+Record = namedtuple("Record", ["body", "type"])
 
 def search_dir(pth):
     """
@@ -22,79 +23,68 @@ def search_dir(pth):
     return bibfiles
 
 
-def process_months(params):
-    stems = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct', 'nov','dec']
-
-    def to_numeric(key):
-        for i, v in enumerate(stems):
-            if v in params[key]:
-                params[key] = str(i)
-                break
-
-    if 'month' in params:
-        to_numeric('month')
-    elif 'Month' in params:
-        to_numeric('Month')
-    return params
-
-
-def read_records(pth: Path) -> BibDatabase:
+def read_records(pth: Path) -> Dict[str, Record]:
     """
-    Retrieve citation record key and the whole record from .bib file.
+    Retrieve citation record key and the whole record and its type from .bib file.
     :param pth: .bib file
-    :return: dict where keys are the record keys and values the whole records
+    :return: dict where keys are the record keys and values the tuples(record type, whole records incl. {})
     """
-    record = "@" + pp.Word(pp.alphanums) + pp.original_text_for(pp.nested_expr("{", "}"))
-    parsed = record.parse_string("the string")
+    record_rule = "@" + pp.Word(pp.alphanums) + pp.original_text_for(pp.nested_expr("{", "}"))
+    file_rule = pp.ZeroOrMore(record_rule)
+    body = pp.common.comma_separated_list
 
-    with open(pth) as bibtex_file:
-        try:
-            bib_database = bibtexparser.load(bibtex_file, parser)
-        except UndefinedString:
-            print(f'UndefinedString exception on: {pth}')
-            raise
+    # we need to strip the {} from the record. Nobody has a better solution yet:
+    # https://stackoverflow.com/questions/76020762/pyparsing-how-to-match-parentheses-around-comma-separated-list
+    strip_body = lambda l: l[1:-1]
 
-    return bib_database
+    file_content = pth.read_text()
+    try:
+        parsed = file_rule.parse_string(file_content)
+        types = parsed[1::3]
+        bodies = parsed[2::3]
+
+        # key must be on the first position otherwise it's not a valid record
+        keys = [x[0] for x in [body.parse_string(strip_body(x)) for x in bodies]]
+
+        return dict(zip(keys, [Record(b, t) for b, t in zip(bodies, types)]))
+    except Exception as e:
+        # append a message to the stacktrace https://stackoverflow.com/a/71605371/245543
+        if len(e.args) >= 1:
+            e.args = (e.args[0] + "Parsing exception for file: " + str(pth),) + e.args[1:]
+        raise
 
 
-def merge_records(records: Dict[str, dict], duplicates: Dict[str, dict], new_records: BibDatabase) -> None:
+def merge_records(records: Dict[str, Record], duplicates: Dict[str, Record],
+                  new_records: Dict[str, Record]) -> None:
     """
     Borrows records and duplicates and merges them with new_records to have distinct keys in records.
-    Note: In this version, it processes only the 'entries' of
-    a BibDatabase object (leaves out 'comments', 'preambles', 'strings'] which is TODO)
     :param records: records with distinct keys
     :param duplicates: records with keys that were already in records
-    :param new_records: a BibDatabase object that is to be merged
+    :param new_records: records to be merged
     :return: None
     """
-    for n in new_records.entries:
-        if n["ID"] in records:
+    for k, v in new_records.items():
+        if k in records:
             i = 0
             suffix = "_" + str(i)
-            while n["ID"] + suffix in duplicates:
+            while k + suffix in duplicates:
                 i += 1
                 suffix = "_" + str(i)
-            duplicates[n["ID"] + suffix] = n
+            duplicates[k + suffix] = v
         else:
-            records[n["ID"]] = n
+            records[k] = v
 
 
-def write_records(records: Dict[str, dict], output_name: str) -> None:
+def write_records(records: Dict[str, Record], output_name: str) -> None:
     """
     Writes the records to a file.
-    Note: In this version, it writes out only the 'entries' of
-    a BibDatabase object (leaves out 'comments', 'preambles', 'strings'] which is TODO)
     :param records: dict (bib record key, bib record entry object)
     :param output_name: out put file name (will be created or overwritten!)
     :return: None
     """
-    new_bd: BibDatabase = BibDatabase()
-    new_bd.entries = records.values()
-
-    # not sure if I could use the 'with' env.
-    f = open(output_name, "w")
-    bibtexparser.dump(new_bd, f)
-    f.close()
+    with open(output_name, 'w') as f:
+        for k, v in records.items():
+            f.write(f"@{v.type}{v.body}\n")
 
 
 def run(pth: Path, output_name: str) -> None:
@@ -105,12 +95,12 @@ def run(pth: Path, output_name: str) -> None:
     :param output_name: output file name (will be created or overwritten!)
     :return:
     """
-    bibs = search_dir(pth)
+    bib_files = search_dir(pth)
 
     records = {}
     duplicates = {}
 
-    for p in bibs:
+    for p in bib_files:
         recs = read_records(Path(p))
         merge_records(records, duplicates, recs)
     write_records(records, output_name)
