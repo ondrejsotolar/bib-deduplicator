@@ -3,23 +3,23 @@ import sys
 from collections import namedtuple
 from pathlib import Path
 import pyparsing as pp
-from bibtexparser.bibdatabase import BibDatabase, UndefinedString
-from typing import Dict, Tuple
+from typing import Dict, Tuple, List
 
 Record = namedtuple("Record", ["body", "type"])
 
-def search_dir(pth):
+
+def search_dir(pth: Path) -> List[Path]:
     """
     Search directory for files with .bib suffix.
     :param pth: start search here
     :return: list of .bib file paths
     """
     bibfiles = []
-    l = os.walk(str(pth), topdown=True, onerror=None, followlinks=False)
-    for (dirpath, dirnames, filenames) in l:
+    found = os.walk(str(pth), topdown=True, onerror=None, followlinks=False)
+    for (dirpath, dirnames, filenames) in found:
         for f in filenames:
             if f.endswith(".bib"):
-                bibfiles.append(str(Path(dirpath, f)))
+                bibfiles.append(Path(dirpath, f))
     return bibfiles
 
 
@@ -92,7 +92,7 @@ def run(pth: Path, output_path: Path) -> None:
     Run the script. It searches a directory for all .bib files and merges them to one file with unique records.
     Furthermore, it outputs all the records with duplicate keys into another file.
     :param pth: path to the directory, where the recursive search for .bib files starts
-    :param output_name: output file name (will be created or overwritten!)
+    :param output_path: output file name (will be created or overwritten!)
     :return:
     """
     bib_files = search_dir(pth)
@@ -104,7 +104,8 @@ def run(pth: Path, output_path: Path) -> None:
         recs = read_records(Path(p))
         merge_records(records, duplicates, recs)
     write_records(records, output_path)
-    write_records(duplicates, Path(output_path.parent, output_path.name.split(".")[0] + "_duplicates" + output_path.suffix))
+    write_records(duplicates,
+                  Path(output_path.parent, output_path.name.split(".")[0] + "_duplicates" + output_path.suffix))
 
 
 if __name__ == '__main__':
