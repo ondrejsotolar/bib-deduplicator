@@ -104,7 +104,7 @@ def run(pth: Path, output_path: Path) -> None:
         recs = read_records(Path(p))
         merge_records(records, duplicates, recs)
     write_records(records, output_path)
-    write_records(duplicates, Path(output_path.name.split(".")[0] + "_duplicates." + output_path.suffix))
+    write_records(duplicates, Path(output_path.parent, output_path.name.split(".")[0] + "_duplicates" + output_path.suffix))
 
 
 if __name__ == '__main__':
